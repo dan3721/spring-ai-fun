@@ -1,0 +1,75 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    # GPU inference (Docker Desktop + WSL2 + NVIDIA). See README prerequisites.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      # CLI targets the long-running ollama service.
+      OLLAMA_HOST: http://ollama:11434
+    # Image ENTRYPOINT is `ollama`; `sh -c` would run as `ollama sh -c ...` and fail.
+    command: ["pull", "${OLLAMA_MODEL:-llama3.1:8b}"]
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      MAVEN_OPTS: -Dmaven.repo.local=/root/.m2/repository
+    command: ["mvn", "-DskipTests", "spring-boot:run"]
+    volumes:
+      - ./backend:/workspace
+      - maven-cache:/root/.m2
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    depends_on:
+      - backend
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_PROXY_TARGET: http://backend:8080
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+    volumes:
+      - ./frontend:/workspace
+      - frontend-node-modules:/workspace/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  ollama-data:
+  maven-cache:
+  frontend-node-modules:
