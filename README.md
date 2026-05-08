@@ -77,8 +77,10 @@ Then open:
 
 The compose stack:
 - starts Ollama
-- pulls model `${OLLAMA_MODEL}` (default `llama3.1:8b`)
+- pulls model `${OLLAMA_MODEL}` (default `qwen2.5:3b`)
 - starts backend and frontend in dev mode
+
+**Why `qwen2.5:3b` by default:** Smaller models vary a lot in how well they honor Spring AI tool calling. In this stack, **Qwen 2.5 3B** behaved more reliably than the previous default when the chat endpoint offers the Tavily **`web_search`** tool (fewer missed or malformed tool calls). Override `OLLAMA_MODEL` anytime if you prefer another tag.
 
 ## First AI / Ollama completion is slow
 
@@ -107,10 +109,12 @@ The stack uses `OLLAMA_MODEL` for both:
 - the `ollama-pull` helper container (downloads the model)
 - the backend Spring AI chat model setting
 
+The default is **`qwen2.5:3b`** (see above). If you switch to another model, expect tool-calling quality for **`web_search`** to vary; you may need to tune prompts or pick a model known for strong function/tool use.
+
 ### One-off run with a different model
 
 ```bash
-OLLAMA_MODEL=llama3.2:3b docker compose up --build
+OLLAMA_MODEL=llama3.1:8b docker compose up --build
 ```
 
 ### Persistent default via `.env`
@@ -118,7 +122,7 @@ OLLAMA_MODEL=llama3.2:3b docker compose up --build
 Create a `.env` file in the project root:
 
 ```bash
-OLLAMA_MODEL=llama3.2:3b
+OLLAMA_MODEL=qwen2.5:3b
 ```
 
 Then run normally:
@@ -144,7 +148,7 @@ OLLAMA_MODEL=mistral docker compose up --build
 
 ### Tavily web search (optional, chat only)
 
-When **`TAVILY_API_KEY`** is set, the backend exposes a Spring AI tool **`web_search`** (Tavily) for **`POST /api/chat`**. The tool is **only attached when your message explicitly asks for a web / internet / online search** (e.g. “web search for …”, “search the web for …”, “search online for …”, “look that up online”, “please do a web search”). Routine questions do not get the tool, so the model cannot auto-call Tavily for weather or news unless you ask that way. **`POST /api/completion`** never includes this tool.
+When **`TAVILY_API_KEY`** is set, the backend registers a Spring AI tool **`web_search`** (Tavily) and attaches it on every **`POST /api/chat`** turn so the model may call it when it decides web search is appropriate. **`POST /api/completion`** never includes this tool.
 
 - **Secrets:** Put the key in a repo-root **`.env`** file (see [`.env.example`](.env.example)); **`.env` is gitignored**. Docker Compose passes **`TAVILY_API_KEY`** into the `backend` service. **Do not** commit real keys in `application.yml` / `application.properties`.
 - **Local `mvn spring-boot:run` without Docker:** Spring does not read `.env` automatically — export `TAVILY_API_KEY` in your shell, use your IDE env from `.env`, or run the stack with **`docker compose`**.

@@ -29,7 +29,7 @@ services:
       # CLI targets the long-running ollama service.
       OLLAMA_HOST: http://ollama:11434
     # Image ENTRYPOINT is `ollama`; `sh -c` would run as `ollama sh -c ...` and fail.
-    command: ["pull", "${OLLAMA_MODEL:-llama3.1:8b}"]
+    command: ["pull", "${OLLAMA_MODEL:-qwen2.5:3b}"]
     restart: "no"
 
   backend:
@@ -42,7 +42,7 @@ services:
         condition: service_completed_successfully
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       SPRING_DEVTOOLS_RESTART_ENABLED: "true"
       MAVEN_OPTS: -Dmaven.repo.local=/root/.m2/repository

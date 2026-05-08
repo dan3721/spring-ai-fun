@@ -55,8 +55,7 @@ public class ChatController {
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                     .user(request.getMessage());
 
-            if (webSearchToolCallback != null
-                    && WebSearchGating.userRequestedWebSearch(request.getMessage())) {
+            if (webSearchToolCallback != null) {
                 promptSpec = promptSpec.toolCallbacks(webSearchToolCallback);
             }
 

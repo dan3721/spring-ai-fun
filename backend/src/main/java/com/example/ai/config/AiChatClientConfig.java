@@ -23,19 +23,11 @@ public class AiChatClientConfig {
     private static final String DEFAULT_CHAT_SYSTEM =
             """
             You are a helpful assistant.
-
-            Answer from your own knowledge and this conversation. Do not call web_search unless this turn \
-            includes that tool and the user has explicitly asked for a web or internet search.
-
-            When web_search is available, use it only after the user clearly requests searching the web, \
-            searching online, a web search, or similar — never for routine questions you can answer yourself.
             """
                     .strip();
 
     private static final String WEB_SEARCH_TOOL_DESCRIPTION =
-            "Public web search via Tavily. Use ONLY in this turn because the user explicitly asked to search "
-                    + "the web / internet / online (e.g. they said 'web search', 'search the web', "
-                    + "'search online'). Do not use for normal chat, coding help, or facts you already know. "
+            "Public web search via Tavily. Use for up-to-date information from the web when needed. "
                     + "Argument: one short search query string.";
 
     @Bean(name = "completionChatClient")
@@ -72,8 +64,7 @@ public class AiChatClientConfig {
                 .description(WEB_SEARCH_TOOL_DESCRIPTION)
                 .inputType(WebSearchRequest.class)
                 .build();
-        log.info(
-                "web_search tool registered (offered on /api/chat only when the user explicitly requests a web search)");
+        log.info("web_search tool registered (offered on /api/chat when TAVILY_API_KEY is set)");
         return callback;
     }
 }
