@@ -1,7 +1,5 @@
-package com.example.ai.controller;
+package com.example.ai.completion;
 
-import com.example.ai.dto.CompletionRequest;
-import com.example.ai.dto.CompletionResponse;
 import com.google.common.base.Stopwatch;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Single-shot text completion (one prompt in, one completion out). For multi-turn
- * conversational APIs, use a separate {@code /api/chat} style controller later.
+ * conversational APIs, use {@link com.example.ai.chat.ChatController}.
  */
 @Slf4j
 @RestController

@@ -43,6 +43,7 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       SPRING_DEVTOOLS_RESTART_ENABLED: "true"
       MAVEN_OPTS: -Dmaven.repo.local=/root/.m2/repository
     command: ["mvn", "-DskipTests", "spring-boot:run"]

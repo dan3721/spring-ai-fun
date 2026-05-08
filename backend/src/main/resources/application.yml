@@ -1,6 +1,17 @@
 server:
   port: ${SERVER_PORT:8080}
 
+# Chat (/api/chat): optional system prompt override (leave blank to use built-in default in Java).
+app:
+  chat:
+    system-instruction: ""
+
+# Tavily: set TAVILY_API_KEY in environment or repo-root .env (Docker Compose loads .env).
+# Optional tuning (no secrets here):
+tavily:
+  max-results: 5
+  search-depth: basic
+
 spring:
   application:
     name: spring-ai-backend

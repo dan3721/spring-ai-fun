@@ -42,7 +42,8 @@ export default function ChatPage() {
       setTurns(
         list.map((m) => ({
           role: m.role || "unknown",
-          content: m.content || ""
+          content: m.content || "",
+          toolNames: Array.isArray(m.toolNames) ? m.toolNames : []
         }))
       );
     } catch {
@@ -114,7 +115,11 @@ export default function ChatPage() {
         setConversationId(nextId);
       }
       const assistantText = data.content || "";
-      setTurns((prev) => [...prev, { role: "assistant", content: assistantText }]);
+      const toolsUsed = Array.isArray(data.toolsUsed) ? data.toolsUsed : [];
+      setTurns((prev) => [
+        ...prev,
+        { role: "assistant", content: assistantText, toolNames: toolsUsed }
+      ]);
     } catch (err) {
       setTurns((prev) => prev.slice(0, -1));
       setError(err.message || "Request failed");
@@ -144,7 +149,10 @@ export default function ChatPage() {
           <div>
             <h1>Chat (with memory)</h1>
             <p className="chat-sub">
-              Server-side memory per conversation id. In-memory only — lost on backend restart.
+              Server-side memory per conversation id. In-memory only — lost on backend restart. With{" "}
+              <code>TAVILY_API_KEY</code>, include an explicit web search request in your message (e.g.{" "}
+              <code>web search for …</code> or <code>search the web for …</code>) to enable the{" "}
+              <code>web_search</code> tool on that turn.
             </p>
           </div>
           <button type="button" className="btn-secondary" onClick={newChat}>
@@ -161,6 +169,15 @@ export default function ChatPage() {
           {turns.length === 0 && <p className="muted">No messages yet. Say hello below.</p>}
           {turns.map((turn, index) => (
             <div key={`${index}-${turn.role}`} className={`turn turn-${turn.role}`}>
+              {(turn.toolNames?.length ?? 0) > 0 && (
+                <div className="turn-tools" aria-label="Tools used">
+                  {(turn.toolNames ?? []).map((name) => (
+                    <span key={name} className="tool-chip">
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
               <pre className="turn-content">{turn.content}</pre>
             </div>
           ))}

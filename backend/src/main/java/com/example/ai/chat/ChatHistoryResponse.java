@@ -1,4 +1,4 @@
-package com.example.ai.dto;
+package com.example.ai.chat;
 
 import java.util.List;
 import lombok.Builder;

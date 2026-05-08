@@ -7,7 +7,7 @@ Minimal full-stack starter with:
 
 ## Project Layout
 
-- `backend/` - Spring Boot API: `POST /api/completion` (single-shot), `POST /api/chat` + `GET /api/chat/{id}/messages` (in-memory conversation)
+- `backend/` - Spring Boot API: `POST /api/completion` (single-shot), `POST /api/chat` + `GET /api/chat/{id}/messages` (in-memory conversation), `POST /api/search` (Tavily only, no LLM)
 - `frontend/` - Vite/React: **Home** (`/`), **Prompt** (`/prompt` → `/api/completion`), **Chat** (`/chat`)
 - `docker-compose.yml` - Dev stack with hot reload
 
@@ -72,6 +72,7 @@ Then open:
 - Frontend UI: `http://localhost:5173` — routes: **`/`** home, **`/prompt`** single-shot, **`/chat`** multi-turn
 - Backend (single-shot): `POST http://localhost:8080/api/completion`
 - Backend (chat + memory): `POST http://localhost:8080/api/chat`, `GET http://localhost:8080/api/chat/{conversationId}/messages`
+- Backend (Tavily smoke test): `POST http://localhost:8080/api/search`
 - Ollama API: `http://localhost:11434`
 
 The compose stack:
@@ -140,6 +141,22 @@ OLLAMA_MODEL=mistral docker compose up --build
 - **Memory:** Spring AI [`ChatMemory`](https://docs.spring.io/spring-ai/reference/1.0/api/chat-memory.html) + `MessageChatMemoryAdvisor` on a dedicated `ChatClient` bean. Stored **in the JVM** — **lost on backend restart** (not durable across deploys). For persistence later, use JDBC/Redis-backed memory from Spring AI.
 - **`conversationId`:** Opaque string (use a UUID). Send the **same** id on each turn. Omit or send blank on first message to let the server assign one (the client UI always generates a UUID for clarity).
 - **New chat:** UI **New chat** assigns a fresh UUID and clears the transcript; no `DELETE` API is required.
+
+### Tavily web search (optional, chat only)
+
+When **`TAVILY_API_KEY`** is set, the backend exposes a Spring AI tool **`web_search`** (Tavily) for **`POST /api/chat`**. The tool is **only attached when your message explicitly asks for a web / internet / online search** (e.g. “web search for …”, “search the web for …”, “search online for …”, “look that up online”, “please do a web search”). Routine questions do not get the tool, so the model cannot auto-call Tavily for weather or news unless you ask that way. **`POST /api/completion`** never includes this tool.
+
+- **Secrets:** Put the key in a repo-root **`.env`** file (see [`.env.example`](.env.example)); **`.env` is gitignored**. Docker Compose passes **`TAVILY_API_KEY`** into the `backend` service. **Do not** commit real keys in `application.yml` / `application.properties`.
+- **Local `mvn spring-boot:run` without Docker:** Spring does not read `.env` automatically — export `TAVILY_API_KEY` in your shell, use your IDE env from `.env`, or run the stack with **`docker compose`**.
+- **Tuning (no secrets):** `tavily.max-results` and `tavily.search-depth` in [`backend/src/main/resources/application.yml`](backend/src/main/resources/application.yml) (defaults: `5`, `basic`). See Tavily docs for credit/latency tradeoffs.
+- If **`TAVILY_API_KEY`** is unset, chat still works; **`web_search`** is not registered.
+- **Direct search (no model):** `POST /api/search` with JSON `{"query":"..."}` returns `{ "query", "output" }` where `output` is the same formatted snippet block the tool uses. Without a key, the response is **503** with a JSON `error` field.
+
+```bash
+curl -s -X POST http://localhost:8080/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Spring AI 1.0 release date"}' | jq .
+```
 
 ### Chat curl examples
 
