@@ -1,5 +1,7 @@
 package com.example.ai.config;
 
+import com.example.ai.fetch.FetchUrlRequest;
+import com.example.ai.fetch.FetchUrlService;
 import com.example.ai.tavily.TavilySearchClient;
 import com.example.ai.tavily.WebSearchRequest;
 import java.util.function.Function;
@@ -20,51 +22,67 @@ import org.springframework.util.StringUtils;
 @Configuration
 public class AiChatClientConfig {
 
-    private static final String DEFAULT_CHAT_SYSTEM =
-            """
-            You are a helpful assistant.
-            """
-                    .strip();
+        private static final String DEFAULT_CHAT_SYSTEM = """
+                        You are a helpful assistant.
+                        """
+                        .strip();
 
-    private static final String WEB_SEARCH_TOOL_DESCRIPTION =
-            "Public web search via Tavily. Use for up-to-date information from the web when needed. "
-                    + "Argument: one short search query string.";
+        private static final String WEB_SEARCH_TOOL_DESCRIPTION = "Public web search via Tavily. Use for up-to-date information from the web when needed. "
+                        + "Argument: one short search query string.";
 
-    @Bean(name = "completionChatClient")
-    public ChatClient completionChatClient(OllamaChatModel ollamaChatModel) {
-        return ChatClient.builder(ollamaChatModel).build();
-    }
+        private static final String FETCH_URL_TOOL_DESCRIPTION = "Fetch a public web page by URL and return its text content (HTML is stripped to visible text). "
+                        + "Use when the user gives a link or you need the body of a specific https page. "
+                        + "Argument: full URL string (https).";
 
-    @Bean(name = "conversationChatClient")
-    public ChatClient conversationChatClient(
-            OllamaChatModel ollamaChatModel,
-            ChatMemory chatMemory,
-            ChatProperties chatProperties,
-            @Value("${TAVILY_API_KEY:}") String tavilyApiKey) {
-
-        String systemPrompt = StringUtils.hasText(chatProperties.getSystemInstruction())
-                ? chatProperties.getSystemInstruction().trim()
-                : DEFAULT_CHAT_SYSTEM;
-
-        if (!StringUtils.hasText(tavilyApiKey)) {
-            log.warn("TAVILY_API_KEY not set — web_search unavailable for /api/chat");
+        @Bean(name = "completionChatClient")
+        public ChatClient completionChatClient(OllamaChatModel ollamaChatModel) {
+                return ChatClient.builder(ollamaChatModel).build();
         }
 
-        return ChatClient.builder(ollamaChatModel)
-                .defaultSystem(systemPrompt)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
-    }
+        @Bean(name = "conversationChatClient")
+        public ChatClient conversationChatClient(
+                        OllamaChatModel ollamaChatModel,
+                        ChatMemory chatMemory,
+                        ChatProperties chatProperties,
+                        @Value("${TAVILY_API_KEY:}") String tavilyApiKey) {
 
-    @Bean(name = "webSearchToolCallback")
-    @Conditional(TavilyApiKeyPresentCondition.class)
-    public ToolCallback webSearchToolCallback(TavilySearchClient tavilySearchClient) {
-        Function<WebSearchRequest, String> runWebSearch = req -> tavilySearchClient.search(req.query());
-        ToolCallback callback = FunctionToolCallback.builder("web_search", runWebSearch)
-                .description(WEB_SEARCH_TOOL_DESCRIPTION)
-                .inputType(WebSearchRequest.class)
-                .build();
-        log.info("web_search tool registered (offered on /api/chat when TAVILY_API_KEY is set)");
-        return callback;
-    }
+                String systemPrompt = StringUtils.hasText(chatProperties.getSystemInstruction())
+                                ? chatProperties.getSystemInstruction().trim()
+                                : DEFAULT_CHAT_SYSTEM;
+
+                if (!StringUtils.hasText(tavilyApiKey)) {
+                        log.warn("TAVILY_API_KEY not set — web_search unavailable for /api/chat");
+                }
+
+                return ChatClient.builder(ollamaChatModel)
+                                .defaultSystem(systemPrompt)
+                                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                                .build();
+        }
+
+        @Bean(name = "webSearchToolCallback")
+        @Conditional(TavilyApiKeyPresentCondition.class)
+        public ToolCallback webSearchToolCallback(TavilySearchClient tavilySearchClient) {
+                Function<WebSearchRequest, String> runWebSearch = req -> tavilySearchClient.search(req.query());
+                ToolCallback callback = FunctionToolCallback.builder("web_search", runWebSearch)
+                                .description(WEB_SEARCH_TOOL_DESCRIPTION)
+                                .inputType(WebSearchRequest.class)
+                                .build();
+                log.info("web_search tool registered (offered on /api/chat when TAVILY_API_KEY is set)");
+                return callback;
+        }
+
+        @Bean(name = "fetchUrlToolCallback")
+        public ToolCallback fetchUrlToolCallback(FetchUrlService fetchUrlService) {
+                Function<FetchUrlRequest, String> runFetch = req -> {
+                        String u = req == null || req.url() == null ? "" : req.url();
+                        return fetchUrlService.fetch(u, true);
+                };
+                ToolCallback callback = FunctionToolCallback.builder("fetch_url", runFetch)
+                                .description(FETCH_URL_TOOL_DESCRIPTION)
+                                .inputType(FetchUrlRequest.class)
+                                .build();
+                log.info("fetch_url tool registered (offered on every /api/chat turn)");
+                return callback;
+        }
 }

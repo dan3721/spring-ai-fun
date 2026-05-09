@@ -5,6 +5,14 @@ server:
 app:
   chat:
     system-instruction: ""
+  fetch-url:
+    max-response-chars: 12000
+    max-download-bytes: 2000000
+    connect-timeout-ms: 5000
+    read-timeout-ms: 15000
+    allow-http: false
+    # Log returned text at INFO (first N chars; 0 = log only character count).
+    log-response-max-chars: 8192
 
 # Tavily: set TAVILY_API_KEY in environment or repo-root .env (Docker Compose loads .env).
 # Optional tuning (no secrets here):
@@ -21,6 +29,8 @@ spring:
       chat:
         options:
           model: ${OLLAMA_MODEL:qwen2.5:3b}
+          # Ollama context (tokens). Qwen2.5 3B GGUF context_length=32768; lower OLLAMA_NUM_CTX if VRAM/RAM is tight.
+          num-ctx: ${OLLAMA_NUM_CTX:32768}
   devtools:
     restart:
       enabled: true

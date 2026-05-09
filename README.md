@@ -7,7 +7,7 @@ Minimal full-stack starter with:
 
 ## Project Layout
 
-- `backend/` - Spring Boot API: `POST /api/completion` (single-shot), `POST /api/chat` + `GET /api/chat/{id}/messages` (in-memory conversation), `POST /api/search` (Tavily only, no LLM)
+- `backend/` - Spring Boot API: `POST /api/completion` (single-shot), `POST /api/chat` + `GET /api/chat/{id}/messages` (in-memory conversation), `POST /api/search` (Tavily only, no LLM), `POST /api/fetch-url` (HTTP fetch only, no LLM)
 - `frontend/` - Vite/React: **Home** (`/`), **Prompt** (`/prompt` → `/api/completion`), **Chat** (`/chat`)
 - `docker-compose.yml` - Dev stack with hot reload
 
@@ -73,6 +73,7 @@ Then open:
 - Backend (single-shot): `POST http://localhost:8080/api/completion`
 - Backend (chat + memory): `POST http://localhost:8080/api/chat`, `GET http://localhost:8080/api/chat/{conversationId}/messages`
 - Backend (Tavily smoke test): `POST http://localhost:8080/api/search`
+- Backend (URL fetch smoke test): `POST http://localhost:8080/api/fetch-url`
 - Ollama API: `http://localhost:11434`
 
 The compose stack:
@@ -80,7 +81,9 @@ The compose stack:
 - pulls model `${OLLAMA_MODEL}` (default `qwen2.5:3b`)
 - starts backend and frontend in dev mode
 
-**Why `qwen2.5:3b` by default:** Smaller models vary a lot in how well they honor Spring AI tool calling. In this stack, **Qwen 2.5 3B** behaved more reliably than the previous default when the chat endpoint offers the Tavily **`web_search`** tool (fewer missed or malformed tool calls). Override `OLLAMA_MODEL` anytime if you prefer another tag.
+**Context length:** The backend sets Ollama **`num_ctx`** via Spring AI (`spring.ai.ollama.chat.options.num-ctx`), default **32768** tokens to match the Qwen2.5 3B GGUF `context_length` (see [`backend/src/main/resources/application.yml`](backend/src/main/resources/application.yml)). Override with **`OLLAMA_NUM_CTX`** (Compose passes it into the `backend` service; see [`.env.example`](.env.example)). If inference **OOM**s or gets very slow, **lower** `OLLAMA_NUM_CTX` (e.g. **16384**).
+
+**Why `qwen2.5:3b` by default:** Smaller models vary a lot in how well they honor Spring AI tool calling. In this stack, **Qwen 2.5 3B** behaved more reliably than the previous default when the chat endpoint offers tools such as Tavily **`web_search`** and **`fetch_url`** (fewer missed or malformed tool calls). Override `OLLAMA_MODEL` anytime if you prefer another tag.
 
 ## First AI / Ollama completion is slow
 
@@ -109,7 +112,7 @@ The stack uses `OLLAMA_MODEL` for both:
 - the `ollama-pull` helper container (downloads the model)
 - the backend Spring AI chat model setting
 
-The default is **`qwen2.5:3b`** (see above). If you switch to another model, expect tool-calling quality for **`web_search`** to vary; you may need to tune prompts or pick a model known for strong function/tool use.
+The default is **`qwen2.5:3b`** (see above). If you switch to another model, expect tool-calling quality for **`web_search`** / **`fetch_url`** to vary; you may need to tune prompts or pick a model known for strong function/tool use.
 
 ### One-off run with a different model
 
@@ -148,7 +151,7 @@ OLLAMA_MODEL=mistral docker compose up --build
 
 ### Tavily web search (optional, chat only)
 
-When **`TAVILY_API_KEY`** is set, the backend registers a Spring AI tool **`web_search`** (Tavily) and attaches it on every **`POST /api/chat`** turn so the model may call it when it decides web search is appropriate. **`POST /api/completion`** never includes this tool.
+When **`TAVILY_API_KEY`** is set, the backend registers a Spring AI tool **`web_search`** (Tavily) and attaches it on every **`POST /api/chat`** turn so the model may call it when it decides web search is appropriate. The **`fetch_url`** tool is also registered on every chat turn (no extra API key): it performs an HTTPS GET server-side and returns visible page text (HTML normalized with **Jsoup**). **`POST /api/completion`** never includes these tools.
 
 - **Secrets:** Put the key in a repo-root **`.env`** file (see [`.env.example`](.env.example)); **`.env` is gitignored**. Docker Compose passes **`TAVILY_API_KEY`** into the `backend` service. **Do not** commit real keys in `application.yml` / `application.properties`.
 - **Local `mvn spring-boot:run` without Docker:** Spring does not read `.env` automatically — export `TAVILY_API_KEY` in your shell, use your IDE env from `.env`, or run the stack with **`docker compose`**.
@@ -160,6 +163,18 @@ When **`TAVILY_API_KEY`** is set, the backend registers a Spring AI tool **`web_
 curl -s -X POST http://localhost:8080/api/search \
   -H "Content-Type: application/json" \
   -d '{"query":"Spring AI 1.0 release date"}' | jq .
+```
+
+### Fetch URL (`fetch_url` tool + exercise endpoint)
+
+- **Chat tool:** On every **`POST /api/chat`** turn, the model may call **`fetch_url`** with a full **`https://...`** URL. Responses are size-capped; HTML is turned into plain text via **Jsoup** (scripts/styles removed). This is intended for **private demos** only (basic host blocking, not full SSRF protection).
+- **Tuning:** [`backend/src/main/resources/application.yml`](backend/src/main/resources/application.yml) under `app.fetch-url`: `max-response-chars`, `max-download-bytes`, `connect-timeout-ms`, `read-timeout-ms`, `allow-http` (default `false`; set `true` if you need plain `http` for local targets), and `log-response-max-chars` (default **8192**: logs that many characters of the returned text at **INFO**; set **0** to log only the character count).
+- **Direct fetch (no model):** `POST /api/fetch-url` with JSON `{"url":"https://..."}` returns `{ "url", "output" }` using the same logic as the tool (handy for curl checks).
+
+```bash
+curl -s -X POST http://localhost:8080/api/fetch-url \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}' | jq .
 ```
 
 ### Chat curl examples

@@ -4,7 +4,9 @@ import com.google.common.base.Stopwatch;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -33,14 +35,17 @@ public class ChatController {
     private final ChatClient conversationChatClient;
     private final ChatMemory chatMemory;
     private final ToolCallback webSearchToolCallback;
+    private final ToolCallback fetchUrlToolCallback;
 
     public ChatController(
             @Qualifier("conversationChatClient") ChatClient conversationChatClient,
             ChatMemory chatMemory,
-            @Autowired(required = false) @Qualifier("webSearchToolCallback") ToolCallback webSearchToolCallback) {
+            @Autowired(required = false) @Qualifier("webSearchToolCallback") ToolCallback webSearchToolCallback,
+            @Qualifier("fetchUrlToolCallback") ToolCallback fetchUrlToolCallback) {
         this.conversationChatClient = conversationChatClient;
         this.chatMemory = chatMemory;
         this.webSearchToolCallback = webSearchToolCallback;
+        this.fetchUrlToolCallback = Objects.requireNonNull(fetchUrlToolCallback, "fetchUrlToolCallback");
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -55,8 +60,11 @@ public class ChatController {
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                     .user(request.getMessage());
 
-            if (webSearchToolCallback != null) {
-                promptSpec = promptSpec.toolCallbacks(webSearchToolCallback);
+            ToolCallback[] tools = Stream.of(webSearchToolCallback, fetchUrlToolCallback)
+                    .filter(Objects::nonNull)
+                    .toArray(ToolCallback[]::new);
+            if (tools.length > 0) {
+                promptSpec = promptSpec.toolCallbacks(tools);
             }
 
             ChatResponse chatResponse = promptSpec.call().chatResponse();

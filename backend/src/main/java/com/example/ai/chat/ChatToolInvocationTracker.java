@@ -6,7 +6,8 @@ import java.util.List;
 /**
  * Records tool names invoked during a single {@code POST /api/chat} turn. Spring AI's
  * {@link org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor} does not persist
- * intermediate tool messages, so memory deltas alone cannot detect {@code web_search}.
+ * intermediate tool messages, so memory deltas alone cannot detect tools such as {@code web_search}
+ * or {@code fetch_url}.
  */
 public final class ChatToolInvocationTracker {
 
@@ -21,7 +22,7 @@ public final class ChatToolInvocationTracker {
         NAMES.set(new LinkedHashSet<>());
     }
 
-    /** Invoked from tool implementations (e.g. Tavily) when a tool actually runs. */
+    /** Invoked from tool implementations (e.g. Tavily, fetch URL) when a tool actually runs. */
     public static void recordTool(String toolName) {
         if (!Boolean.TRUE.equals(ACTIVE.get()) || toolName == null || toolName.isBlank()) {
             return;
